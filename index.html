@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f4c45">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<title>Daily Expenses</title>
+<style>
+:root{--bg:#eef2ef;--card:#fff;--ink:#14231f;--mute:#6b7c76;--line:#d9e1dd;--brand:#0f4c45;--gold:#f2b632;--red:#b3402f}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1714;--card:#17241f;--ink:#e8efec;--mute:#8da19a;--line:#26372f;--brand:#2f8f82;--red:#e0705e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:env(safe-area-inset-top) 0 90px}
+main{max-width:520px;margin:auto;padding:0 16px}
+.top{background:var(--brand);color:#fff;padding:22px 16px 26px;border-radius:0 0 22px 22px}
+.top div{max-width:520px;margin:auto}
+.big{font-size:44px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+.big small{font-size:18px;font-weight:500;opacity:.75;margin-right:6px}
+.sub{opacity:.8;font-size:14px;margin-top:4px}
+h2{font-size:15px;color:var(--mute);margin:22px 0 8px;display:flex;justify-content:space-between;font-weight:600}
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer}
+.row .t{flex:1;min-width:0}.row .n{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row b{font-variant-numeric:tabular-nums}
+.empty{color:var(--mute);text-align:center;padding:40px 10px}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--gold);color:#2a1d00;border:0;border-radius:28px;padding:15px 22px;font:700 16px inherit;box-shadow:0 4px 14px #0004}
+dialog{border:0;border-radius:18px;padding:20px;width:min(92vw,420px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#0008}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg);color:var(--ink)}
+#amt{font-size:26px;font-weight:700}
+.btns{display:flex;gap:10px;margin-top:18px}
+button{font:600 15px inherit;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);flex:1}
+button.p{background:var(--brand);color:#fff;border-color:var(--brand)}
+button.d{color:var(--red);flex:0 0 auto}
+.link{background:none;border:0;color:var(--brand);padding:0;flex:0;font-size:14px}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+</style></head><body>
+<div class="top"><div>
+<div class="sub">Today</div><div class="big"><small>Rs</small><span id="today">0</span></div>
+<div class="sub">This month: Rs <span id="month">0</span></div>
+</div></div>
+<main>
+<h2><span>History</span><button class="link" id="exp">Export CSV</button></h2>
+<div id="list"></div>
+</main>
+<button class="fab" id="add">+ Add expense</button>
+
+<dialog id="dlg"><form method="dialog" id="f">
+<h3 id="ttl" style="margin:0">New expense</h3>
+<label for="amt">Amount (Rs)</label><input id="amt" type="number" inputmode="decimal" min="0" step="any" required>
+<label for="cat">Category</label>
+<select id="cat"><option>Food</option><option>Transport</option><option>Bills</option><option>Shopping</option><option>Health</option><option>Other</option></select>
+<label for="note">Note</label><input id="note" maxlength="80" placeholder="Optional">
+<label for="date">Date</label><input id="date" type="date" required>
+<div class="btns"><button type="button" class="d" id="del">Delete</button><button type="button" id="cancel">Cancel</button><button class="p" type="submit">Save</button></div>
+</form></dialog>
+
+<script>
+const $=id=>document.getElementById(id);
+let db,editId=null;
+const open=indexedDB.open('expenses',1);
+open.onupgradeneeded=()=>open.result.createObjectStore('e',{keyPath:'id',autoIncrement:true});
+open.onsuccess=()=>{db=open.result;render()};
+const store=m=>db.transaction('e',m).objectStore('e');
+const all=()=>new Promise(r=>{store('readonly').getAll().onsuccess=e=>r(e.target.result)});
+const put=x=>new Promise(r=>{store('readwrite').put(x).onsuccess=r});
+const rm=id=>new Promise(r=>{store('readwrite').delete(id).onsuccess=r});
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const fmt=n=>Math.round(n*100)/100;
+const nice=s=>{const t=iso(new Date());const y=iso(new Date(Date.now()-864e5));
+ return s===t?'Today':s===y?'Yesterday':new Date(s+'T00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})};
+async function render(){
+ const d=await all();d.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+ const t=iso(new Date()),m=t.slice(0,7);
+ $('today').textContent=fmt(d.filter(x=>x.date===t).reduce((s,x)=>s+x.amount,0));
+ $('month').textContent=fmt(d.filter(x=>x.date.startsWith(m)).reduce((s,x)=>s+x.amount,0));
+ const g={};d.forEach(x=>(g[x.date]=g[x.date]||[]).push(x));
+ const L=$('list');L.innerHTML='';
+ if(!d.length){L.innerHTML='<div class="empty">No expenses yet. Tap “Add expense” to record your first one.</div>';return}
+ for(const day in g){
+  const h=document.createElement('h2');
+  h.innerHTML='<span></span><span></span>';h.children[0].textContent=nice(day);
+  h.children[1].textContent='Rs '+fmt(g[day].reduce((s,x)=>s+x.amount,0));L.append(h);
+  g[day].forEach(x=>{const r=document.createElement('div');r.className='row';r.tabIndex=0;
+   r.innerHTML='<div class="t"><div></div><div class="n"></div></div><b></b>';
+   r.querySelector('.t div').textContent=x.category;
+   r.querySelector('.n').textContent=x.note||'—';
+   r.querySelector('b').textContent=fmt(x.amount);
+   r.onclick=()=>openForm(x);r.onkeydown=e=>e.key==='Enter'&&openForm(x);L.append(r)})}
+}
+function openForm(x){
+ editId=x?x.id:null;
+ $('ttl').textContent=x?'Edit expense':'New expense';
+ $('amt').value=x?x.amount:'';$('cat').value=x?x.category:'Food';
+ $('note').value=x?x.note:'';$('date').value=x?x.date:iso(new Date());
+ $('del').style.display=x?'':'none';$('dlg').showModal();$('amt').focus();
+}
+$('add').onclick=()=>openForm();
+$('cancel').onclick=()=>$('dlg').close();
+$('f').onsubmit=async()=>{
+ const x={amount:parseFloat($('amt').value),category:$('cat').value,note:$('note').value.trim(),date:$('date').value};
+ if(editId!==null)x.id=editId;await put(x);render();
+};
+$('del').onclick=async()=>{if(confirm('Delete this expense?')){await rm(editId);$('dlg').close();render()}};
+$('exp').onclick=async()=>{
+ const d=await all();if(!d.length)return alert('Nothing to export yet.');
+ const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ const csv='Date,Category,Amount,Note\n'+d.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>[x.date,x.category,x.amount,q(x.note)].join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+ a.download='expenses-'+iso(new Date())+'.csv';a.click();
+};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body></html>
