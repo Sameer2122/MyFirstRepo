@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f4c45">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<title>Daily Expenses</title>
+<style>
+:root{--bg:#eef2ef;--card:#fff;--ink:#14231f;--mute:#6b7c76;--line:#d9e1dd;--brand:#0f4c45;--gold:#f2b632;--red:#b3402f;--green:#1f7a4d}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1714;--card:#17241f;--ink:#e8efec;--mute:#8da19a;--line:#26372f;--brand:#2f8f82;--red:#e0705e;--green:#5cc48c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:env(safe-area-inset-top) 0 90px}
+main{max-width:520px;margin:auto;padding:0 16px}
+.top{background:var(--brand);color:#fff;padding:20px 16px 24px;border-radius:0 0 22px 22px}
+.top>div{max-width:520px;margin:auto}
+.hd{display:flex;justify-content:space-between;align-items:center}
+.gear{background:none;border:0;color:#fff;font-size:22px;padding:0;flex:0}
+.big{font-size:44px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+.big small{font-size:18px;font-weight:500;opacity:.75;margin-right:6px}
+.sub{opacity:.85;font-size:14px;margin-top:4px}
+.tabs{display:flex;gap:8px;margin:16px 0 4px}
+.tabs button{flex:1;padding:10px}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.warn{background:#f6d9d3;color:#7a2417;border-radius:10px;padding:10px 12px;margin:12px 0 0;font-size:14px;display:none}
+h2{font-size:15px;color:var(--mute);margin:22px 0 8px;display:flex;justify-content:space-between;font-weight:600}
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer}
+.row .t{flex:1;min-width:0}.row .n{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row b{font-variant-numeric:tabular-nums}
+.row.done{opacity:.5}.row.done b{text-decoration:line-through}
+.give{color:var(--red)}.get{color:var(--green)}
+.sum{display:flex;gap:10px;margin-top:14px}
+.sum div{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.sum span{font-size:13px;color:var(--mute);display:block}.sum b{font-size:22px}
+.empty{color:var(--mute);text-align:center;padding:40px 10px}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--gold);color:#2a1d00;border:0;border-radius:28px;padding:15px 22px;font:700 16px inherit;box-shadow:0 4px 14px #0004;flex:0}
+dialog{border:0;border-radius:18px;padding:20px;width:min(92vw,420px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#0008}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg);color:var(--ink)}
+input[type=checkbox]{width:auto;margin-right:8px}
+.amt{font-size:26px;font-weight:700}
+.btns{display:flex;gap:10px;margin-top:18px}
+button{font:600 15px inherit;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);flex:1}
+button.p{background:var(--brand);color:#fff;border-color:var(--brand)}
+button.d{color:var(--red);flex:0 0 auto}
+.link{background:none;border:0;color:var(--brand);padding:0;flex:0;font-size:14px;white-space:nowrap}
+.hint{font-size:12px;color:var(--mute);margin-top:6px}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.hide{display:none!important}
+</style></head><body>
+<div class="top"><div>
+<div class="hd"><div class="sub">Today</div><button class="gear" id="set" aria-label="Settings">⚙</button></div>
+<div class="big"><small>Rs</small><span id="today">0</span></div>
+<div class="sub">Week: Rs <span id="week">0</span><span id="wl"></span> &nbsp;|&nbsp; Month: Rs <span id="month">0</span><span id="ml"></span></div>
+</div></div>
+<main>
+<div class="warn" id="warn"></div>
+<div class="tabs"><button id="t1" class="on">Expenses</button><button id="t2">Loans</button></div>
+
+<section id="v1"><h2><span>History</span><button class="link" id="exp">Export CSV</button></h2><div id="list"></div></section>
+
+<section id="v2" class="hide">
+<div class="sum"><div><span>I have to give</span><b class="give" id="sg">0</b></div><div><span>I will receive</span><b class="get" id="sr">0</b></div></div>
+<h2><span>Loans</span></h2><div id="llist"></div>
+</section>
+</main>
+<button class="fab" id="add">+ Add expense</button>
+
+<dialog id="dlg"><form method="dialog" id="f">
+<h3 id="ttl" style="margin:0">New expense</h3>
+<label for="amt">Amount (Rs)</label><input id="amt" class="amt" type="number" inputmode="decimal" min="0" step="any" required>
+<label for="cat">Category</label>
+<select id="cat"><option>Food</option><option>Transport</option><option>Bills</option><option>Shopping</option><option>Health</option><option>Other</option></select>
+<label for="note">Note</label><input id="note" maxlength="80" placeholder="Optional">
+<label for="date">Date</label><input id="date" type="date" required>
+<div class="btns"><button type="button" class="d" id="del">Delete</button><button type="button" id="cancel">Cancel</button><button class="p" type="submit">Save</button></div>
+</form></dialog>
+
+<dialog id="ldlg"><form method="dialog" id="lf">
+<h3 id="lttl" style="margin:0">New loan</h3>
+<label for="ldir">Type</label>
+<select id="ldir"><option value="give">I borrowed – I have to give back</option><option value="get">I lent – I will receive</option></select>
+<label for="lper">Person</label><input id="lper" maxlength="40" required>
+<label for="lamt">Amount (Rs)</label><input id="lamt" class="amt" type="number" inputmode="decimal" min="0" step="any" required>
+<label for="ldate">Date</label><input id="ldate" type="date" required>
+<label for="lnote">Note</label><input id="lnote" maxlength="80" placeholder="Optional">
+<label><input type="checkbox" id="ldone">Settled (paid back)</label>
+<div class="btns"><button type="button" class="d" id="ldel">Delete</button><button type="button" id="lcancel">Cancel</button><button class="p" type="submit">Save</button></div>
+</form></dialog>
+
+<dialog id="sdlg"><form method="dialog" id="sf">
+<h3 style="margin:0">Spending limits</h3>
+<label for="lw">Weekly limit (Rs)</label><input id="lw" type="number" inputmode="decimal" min="0" step="any" placeholder="0 = no limit">
+<label for="lm">Monthly limit (Rs)</label><input id="lm" type="number" inputmode="decimal" min="0" step="any" placeholder="0 = no limit">
+<p class="hint" id="nstat"></p>
+<div class="btns"><button type="button" id="scancel">Cancel</button><button class="p" type="submit">Save</button></div>
+</form></dialog>
+
+<script>
+const $=id=>document.getElementById(id);
+let db,editId=null,editL=null;
+const open=indexedDB.open('expenses',2);
+open.onupgradeneeded=()=>{const d=open.result;
+ if(!d.objectStoreNames.contains('e'))d.createObjectStore('e',{keyPath:'id',autoIncrement:true});
+ if(!d.objectStoreNames.contains('l'))d.createObjectStore('l',{keyPath:'id',autoIncrement:true})};
+open.onsuccess=()=>{db=open.result;render(true)};
+const st=(s,m)=>db.transaction(s,m).objectStore(s);
+const all=s=>new Promise(r=>{st(s,'readonly').getAll().onsuccess=e=>r(e.target.result)});
+const put=(s,x)=>new Promise(r=>{st(s,'readwrite').put(x).onsuccess=r});
+const rm=(s,id)=>new Promise(r=>{st(s,'readwrite').delete(id).onsuccess=r});
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const fmt=n=>Math.round(n*100)/100;
+const lim=()=>{try{return JSON.parse(localStorage.getItem('lim'))||{w:0,m:0}}catch(e){return{w:0,m:0}}};
+const weekStart=()=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)};
+const nice=s=>{const t=iso(new Date());const y=iso(new Date(Date.now()-864e5));
+ return s===t?'Today':s===y?'Yesterday':new Date(s+'T00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})};
+
+function notify(title,body){
+ if(!('Notification' in window)||Notification.permission!=='granted')return;
+ if(navigator.serviceWorker)navigator.serviceWorker.ready.then(r=>r.showNotification(title,{body,icon:'icon.svg',tag:title}));
+ else new Notification(title,{body});
+}
+function checkLimits(wt,mt,alert){
+ const L=lim(),w=weekStart(),m=iso(new Date()).slice(0,7),msgs=[];
+ let sent={};try{sent=JSON.parse(localStorage.getItem('sent'))||{}}catch(e){}
+ if(L.w>0&&wt>L.w)msgs.push(['w'+w,'Weekly limit exceeded','You spent Rs '+fmt(wt)+' this week. Limit: Rs '+L.w]);
+ if(L.m>0&&mt>L.m)msgs.push(['m'+m,'Monthly limit exceeded','You spent Rs '+fmt(mt)+' this month. Limit: Rs '+L.m]);
+ $('warn').style.display=msgs.length?'block':'none';
+ $('warn').textContent=msgs.map(x=>x[1]+' – '+x[2]).join('  •  ');
+ if(alert)msgs.forEach(x=>{if(!sent[x[0]]){sent[x[0]]=1;notify(x[1],x[2])}});
+ localStorage.setItem('sent',JSON.stringify(sent));
+}
+async function render(alert){
+ const d=await all('e');d.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+ const t=iso(new Date()),m=t.slice(0,7),w=weekStart();
+ const sum=f=>fmt(d.filter(f).reduce((s,x)=>s+x.amount,0));
+ const wt=sum(x=>x.date>=w&&x.date<=t),mt=sum(x=>x.date.startsWith(m));
+ $('today').textContent=sum(x=>x.date===t);$('week').textContent=wt;$('month').textContent=mt;
+ const L=lim();$('wl').textContent=L.w?' / '+L.w:'';$('ml').textContent=L.m?' / '+L.m:'';
+ checkLimits(wt,mt,alert);
+ const g={};d.forEach(x=>(g[x.date]=g[x.date]||[]).push(x));
+ const E=$('list');E.innerHTML='';
+ if(!d.length)E.innerHTML='<div class="empty">No expenses yet. Tap “Add expense” to record your first one.</div>';
+ for(const day in g){
+  const h=document.createElement('h2');h.innerHTML='<span></span><span></span>';
+  h.children[0].textContent=nice(day);h.children[1].textContent='Rs '+fmt(g[day].reduce((s,x)=>s+x.amount,0));E.append(h);
+  g[day].forEach(x=>{const r=document.createElement('div');r.className='row';r.tabIndex=0;
+   r.innerHTML='<div class="t"><div></div><div class="n"></div></div><b></b>';
+   r.querySelector('.t div').textContent=x.category;r.querySelector('.n').textContent=x.note||'—';
+   r.querySelector('b').textContent=fmt(x.amount);
+   r.onclick=()=>openForm(x);r.onkeydown=e=>e.key==='Enter'&&openForm(x);E.append(r)})}
+ renderLoans();
+}
+async function renderLoans(){
+ const d=await all('l');d.sort((a,b)=>(a.done-b.done)||b.date.localeCompare(a.date));
+ const s=k=>fmt(d.filter(x=>!x.done&&x.dir===k).reduce((a,x)=>a+x.amount,0));
+ $('sg').textContent='Rs '+s('give');$('sr').textContent='Rs '+s('get');
+ const E=$('llist');E.innerHTML='';
+ if(!d.length)E.innerHTML='<div class="empty">No loans yet. Tap “Add loan” to record money you borrowed or lent.</div>';
+ d.forEach(x=>{const r=document.createElement('div');r.className='row'+(x.done?' done':'');r.tabIndex=0;
+  r.innerHTML='<div class="t"><div></div><div class="n"></div></div><b></b>';
+  r.querySelector('.t div').textContent=x.person;
+  r.querySelector('.n').textContent=(x.dir==='give'?'I owe · ':'Owes me · ')+nice(x.date)+(x.done?' · settled':'')+(x.note?' · '+x.note:'');
+  const b=r.querySelector('b');b.textContent=fmt(x.amount);b.className=x.dir;
+  r.onclick=()=>openLoan(x);r.onkeydown=e=>e.key==='Enter'&&openLoan(x);E.append(r)});
+}
+function openForm(x){
+ editId=x?x.id:null;$('ttl').textContent=x?'Edit expense':'New expense';
+ $('amt').value=x?x.amount:'';$('cat').value=x?x.category:'Food';
+ $('note').value=x?x.note:'';$('date').value=x?x.date:iso(new Date());
+ $('del').style.display=x?'':'none';$('dlg').showModal();$('amt').focus();
+}
+function openLoan(x){
+ editL=x?x.id:null;$('lttl').textContent=x?'Edit loan':'New loan';
+ $('ldir').value=x?x.dir:'give';$('lper').value=x?x.person:'';$('lamt').value=x?x.amount:'';
+ $('ldate').value=x?x.date:iso(new Date());$('lnote').value=x?x.note:'';$('ldone').checked=x?!!x.done:false;
+ $('ldel').style.display=x?'':'none';$('ldlg').showModal();$('lper').focus();
+}
+let tab=1;
+function show(n){tab=n;$('v1').classList.toggle('hide',n!==1);$('v2').classList.toggle('hide',n!==2);
+ $('t1').classList.toggle('on',n===1);$('t2').classList.toggle('on',n===2);
+ $('add').textContent=n===1?'+ Add expense':'+ Add loan'}
+$('t1').onclick=()=>show(1);$('t2').onclick=()=>show(2);
+$('add').onclick=()=>tab===1?openForm():openLoan();
+$('cancel').onclick=()=>$('dlg').close();$('lcancel').onclick=()=>$('ldlg').close();$('scancel').onclick=()=>$('sdlg').close();
+$('f').onsubmit=async()=>{
+ const x={amount:parseFloat($('amt').value),category:$('cat').value,note:$('note').value.trim(),date:$('date').value};
+ if(editId!==null)x.id=editId;await put('e',x);render(true)};
+$('lf').onsubmit=async()=>{
+ const x={dir:$('ldir').value,person:$('lper').value.trim(),amount:parseFloat($('lamt').value),date:$('ldate').value,note:$('lnote').value.trim(),done:$('ldone').checked};
+ if(editL!==null)x.id=editL;await put('l',x);renderLoans()};
+$('del').onclick=async()=>{if(confirm('Delete this expense?')){await rm('e',editId);$('dlg').close();render()}};
+$('ldel').onclick=async()=>{if(confirm('Delete this loan?')){await rm('l',editL);$('ldlg').close();renderLoans()}};
+$('set').onclick=()=>{const L=lim();$('lw').value=L.w||'';$('lm').value=L.m||'';
+ $('nstat').textContent=!('Notification' in window)?'Notifications are not supported in this browser.':
+  Notification.permission==='granted'?'Notifications are on. You get an alert when you add an expense that crosses a limit.':
+  Notification.permission==='denied'?'Notifications are blocked. Allow them in your browser/site settings.':'Saving will ask permission to send notifications.';
+ $('sdlg').showModal()};
+$('sf').onsubmit=async()=>{
+ localStorage.setItem('lim',JSON.stringify({w:parseFloat($('lw').value)||0,m:parseFloat($('lm').value)||0}));
+ localStorage.removeItem('sent');
+ if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission();
+ render(true)};
+function dl(name,csv){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click()}
+$('exp').onclick=async()=>{
+ const d=await all('e'),l=await all('l');if(!d.length&&!l.length)return alert('Nothing to export yet.');
+ const q=s=>'"'+String(s).replace(/"/g,'""')+'"',t=iso(new Date());
+ if(d.length)dl('expenses-'+t+'.csv','Date,Category,Amount,Note\n'+d.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>[x.date,x.category,x.amount,q(x.note)].join(',')).join('\n'));
+ if(l.length)setTimeout(()=>dl('loans-'+t+'.csv','Date,Type,Person,Amount,Settled,Note\n'+l.map(x=>[x.date,x.dir==='give'?'I owe':'Owes me',q(x.person),x.amount,x.done?'yes':'no',q(x.note)].join(',')).join('\n')),400);
+};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body></html>
